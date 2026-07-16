@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Planeta</title>
+    <style>
+        body { font-family: Arial, sans-serif; display: flex; gap: 20px; }
+        .controls { background: #f0f0f0; padding: 15px; border-radius: 8px; }
+        canvas { border: 1px solid black; box-shadow: 2px 2px 10px rgba(0,0,0,0.5); }
+        .slider-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div>
+    <canvas id="gl-canvas" width="800" height="800">
+        O seu navegador não suporta a tag de canvas do HTML5.
+    </canvas>
+</div>
+
+<div class="controls">
+    <h3>Controles da Câmera</h3>
+    <div class="slider-group">
+        <label>Câmera X: <span id="camX-val">0</span></label>
+        <input type="range" id="camX" min="-5" max="5" step="0.1" value="0">
+    </div>
+    <div class="slider-group">
+        <label>Câmera Y: <span id="camY-val">2</span></label>
+        <input type="range" id="camY" min="-5" max="5" step="0.1" value="2">
+    </div>
+    <div class="slider-group">
+        <label>Câmera Z: <span id="camZ-val">4</span></label>
+        <input type="range" id="camZ" min="-5" max="10" step="0.1" value="4">
+    </div>
+
+    <h3>Controles da Luz</h3>
+    <div class="slider-group">
+        <label>Luz X: <span id="lightX-val">2</span></label>
+        <input type="range" id="lightX" min="-5" max="5" step="0.1" value="2">
+    </div>
+    <div class="slider-group">
+        <label>Luz Y: <span id="lightY-val">4</span></label>
+        <input type="range" id="lightY" min="0" max="10" step="0.1" value="4">
+    </div>
+    <div class="slider-group">
+        <label>Luz Z: <span id="lightZ-val">2</span></label>
+        <input type="range" id="lightZ" min="-5" max="5" step="0.1" value="2">
+    </div>
+</div>
+
+<script id="shadow-vertex-shader" type="x-shader/x-vertex">
+    #version 300 es
+    layout(location = 0) in vec4 aPosition;
+
+    uniform mat4 uLightProjectionMatrix;
+    uniform mat4 uLightViewMatrix;
+    uniform mat4 uModelMatrix;
+
+    void main() {
+        gl_Position = uLightProjectionMatrix * uLightViewMatrix * uModelMatrix * aPosition;
+    }
+    </script>
+
+    <script id="shadow-fragment-shader" type="x-shader/x-fragment">
+    #version 300 es
+    precision highp float;
+
+    void main() {}
+    </script>
+
+    <script id="render-vertex-shader" type="x-shader/x-vertex">
+    #version 300 es
+    layout(location = 0) in vec4 aPosition;
+    layout(location = 1) in vec3 aNormal;
+    layout(location = 2) in vec2 aTexCoord;
+
+    uniform mat4 uModelMatrix;
+    uniform mat4 uViewMatrix;
+    uniform mat4 uProjectionMatrix;
+    uniform mat4 uLightProjectionMatrix;
+    uniform mat4 uLightViewMatrix;
+
+    out vec3 vNormal;
+    out vec3 vFragPos;
+    out vec2 vTexCoord;
+    out vec4 vFragPosLightSpace;
+
+    void main() {
+        vFragPos = vec3(uModelMatrix * aPosition);
+        vNormal = mat3(uModelMatrix) * aNormal;
+        vTexCoord = aTexCoord;
+        
+        vFragPosLightSpace = uLightProjectionMatrix * uLightViewMatrix * vec4(vFragPos, 1.0);
+        
+        gl_Position = uProjectionMatrix * uViewMatrix * vec4(vFragPos, 1.0);
+    }
+</script>
+
+<script id="render-fragment-shader" type="x-shader/x-fragment">
+    #version 300 es
+    precision highp float;
+
+    in vec3 vNormal;
+    in vec3 vFragPos;
+    in vec2 vTexCoord;
+    in vec4 vFragPosLightSpace;
+
+    uniform vec3 uLightPos;
+    uniform vec3 uViewPos;
+    uniform sampler2D uTexture;
+    uniform sampler2D uShadowMap;
+    uniform bool uIsFloor;
+
+    out vec4 fColor;
+
+    float ShadowCalculation(vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
+        vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+        projCoords = projCoords * 0.5 + 0.5;
+        if(projCoords.z > 1.0) return 0.0;
+        float closestDepth = texture(uShadowMap, projCoords.xy).r; 
+        float currentDepth = projCoords.z;
+        float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.001);
+        float shadow = currentDepth - bias > closestDepth  ? 1.0 : 0.0;
+        return shadow;
+    }
+
+    void main() {
+        vec4 baseColor;
+        
+        if (uIsFloor) {
+            baseColor = vec4(0.8, 0.8, 0.8, 1.0); 
+        } else {
+            baseColor = texture(uTexture, vTexCoord);
+        }
+        
+        float ambientStrength = 0.3;
+        vec3 ambient = ambientStrength * baseColor.rgb;
+        
+        vec3 norm = normalize(vNormal);
+        vec3 lightDir = normalize(uLightPos - vFragPos);
+        float diff = max(dot(norm, lightDir), 0.0);
+        vec3 diffuse = diff * baseColor.rgb;
+        
+        float specularStrength = uIsFloor ? 0.1 : 0.5; 
+        vec3 viewDir = normalize(uViewPos - vFragPos);
+        vec3 reflectDir = reflect(-lightDir, norm);
+        float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
+        vec3 specular = specularStrength * spec * vec3(1.0, 1.0, 1.0);
+        
+        float shadow = ShadowCalculation(vFragPosLightSpace, norm, lightDir);
+        vec3 result = ambient + (1.0 - shadow) * (diffuse + specular);
+        
+        fColor = vec4(result, baseColor.a);
+    }
+</script>
+
+<script src="./Common/initShaders.js"></script>
+<script src="./Common/MVnew.js"></script>
+<script src="esfera.js"></script>
+
+</body>
+</html>
