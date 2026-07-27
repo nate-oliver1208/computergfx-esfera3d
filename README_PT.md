@@ -1,5 +1,7 @@
 # Renderização de Esfera 3D em WebGL 2.0: Texturização, Iluminação e Sombreamento Dinâmico
 
+*Leia isto em outros idiomas: [English 🇺🇸](README.md)*
+
 Este repositório apresenta um motor de renderização 3D em tempo real construído diretamente sobre a API gráfica de baixo nível **WebGL 2.0** (GLSL `#version 300 es`). A aplicação gera matematicamente uma esfera tridimensional, aplica mapeamento de textura assíncrona, simula iluminação física por fragmento (Phong Shading) e projeta sombras realistas em tempo real utilizando a técnica avançada de **Shadow Mapping** (mapeamento de sombras por múltiplas passagens).
 
 O projeto conta com controles interativos que permitem manipular, em tempo real, a posição tridimensional da câmera virtual e da fonte de luz pontual através de sliders na interface.
