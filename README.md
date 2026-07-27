@@ -1,69 +1,71 @@
-# Renderização de Esfera 3D em WebGL 2.0: Texturização, Iluminação e Sombreamento Dinâmico
+# 3D Sphere Rendering in WebGL 2.0: Texturing, Lighting, and Dynamic Shadowing
 
-Este repositório apresenta um motor de renderização 3D em tempo real construído diretamente sobre a API gráfica de baixo nível **WebGL 2.0** (GLSL `#version 300 es`). A aplicação gera matematicamente uma esfera tridimensional, aplica mapeamento de textura assíncrona, simula iluminação física por fragmento (Phong Shading) e projeta sombras realistas em tempo real utilizando a técnica avançada de **Shadow Mapping** (mapeamento de sombras por múltiplas passagens).
+*Read this in other languages: [Português 🇧🇷](README_PT.md)*
 
-O projeto conta com controles interativos que permitem manipular, em tempo real, a posição tridimensional da câmera virtual e da fonte de luz pontual através de sliders na interface.
+This repository features a real-time 3D rendering engine built directly on top of the low-level **WebGL 2.0** graphics API (GLSL `#version 300 es`). The application mathematically generates a three-dimensional sphere, applies asynchronous texture mapping, simulates per-fragment physical lighting (Phong Shading), and projects realistic real-time shadows using the advanced multi-pass **Shadow Mapping** technique.
 
-Este trabalho foi desenvolvido como projeto final para a disciplina de **Computação Gráfica**, no primeiro semestre de 2026, no curso de **Bacharelado em Engenharia da Computação** do **Instituto Federal de São Paulo (IFSP) - Campus Guarulhos**.
+The project includes interactive controls that allow real-time manipulation of the three-dimensional position of both the virtual camera and the point light source via user interface sliders.
+
+This work was developed as the final course project for **Computer Graphics** during the first semester of 2026, in the **Bachelor's Degree in Computer Engineering** program at **Instituto Federal de São Paulo (IFSP) – Campus Guarulhos**.
 
 <img width="1000" alt="Captura de tela 2026-07-15 215741" src="https://github.com/user-attachments/assets/c031a025-a07d-4499-b340-601995a1dac1" />
 
 ---
 
-## Principais Fundamentos e Funcionalidades Técnicas
+## Key Technical Fundamentals & Features
 
-### 1. Modelagem Geométrica Paramétrica
-*   **Geração Matemática Dinâmica:** A malha (mesh) poligonal da esfera não depende do carregamento de arquivos de modelos externos (como `.obj` ou `.gltf`). Ela é gerada puramente via programação matemática através de equações trigonométricas latitudinais e longitudinais no script `esfera.js`.
-*   **Otimização de Memória da GPU:** Dado que a esfera possui raio Unitário ($1.0$) e está centrada na origem, a posição espacial de qualquer vértice coincide perfeitamente com a direção do seu vetor normal. O código aproveita essa simetria física para popular simultaneamente o Buffer de Posições e o Buffer de Normais, otimizando o envio de dados para os barramentos da placa de vídeo.
+### 1. Parametric Geometric Modeling
+*   **Dynamic Mathematical Generation:** The sphere's polygonal mesh does not rely on loading external model files (such as `.obj` or `.gltf`). It is generated purely via mathematical programming using latitudinal and longitudinal trigonometric equations in the `esfera.js` script.
+*   **GPU Memory Optimization:** Since the sphere has a Unit Radius ($1.0$) and is centered at the origin, the spatial position of any vertex perfectly coincides with its normal vector direction. The code leverages this physical symmetry to simultaneously populate both the Position Buffer and the Normal Buffer, optimizing data transfer across graphics card buses.
 
-### 2. Câmera Virtual Interativa - Espaço de Visualização
-*   **Cálculo Matricial em Tempo Real:** A movimentação da câmera utiliza um modelo interativo cuja matriz de Visualização (View Matrix) é gerada via funções de álgebra linear `lookAt` da biblioteca matemática `MVnew.js`.
-*   As matrizes de Modelo, Visão e Projeção Perspectiva são recalculadas dinamicamente e injetadas de forma contínua no ciclo de renderização (`requestAnimationFrame`) através de variáveis `uniform` no Vertex Shader.
+### 2. Interactive Virtual Camera – View Space
+*   **Real-Time Matrix Calculation:** Camera movement utilizes an interactive model whose View Matrix is generated via `lookAt` linear algebra functions from the `MVnew.js` math library.
+*   The Model, View, and Perspective Projection matrices are recalculated dynamically and continuously injected into the render loop (`requestAnimationFrame`) through `uniform` variables in the Vertex Shader.
 
-### 3. Texturização Assíncrona e Contorne de Bloqueio CORS
-*   **Renderização Não Bloqueante:** Para evitar gargalos de carregamento, o mapeamento de textura 2D ocorre de forma assíncrona. O sistema cria um buffer temporário de cor sólida (placeholder) e, após o evento de download do bitmap definitivo, renderiza a imagem real e executa a otimização de nível de detalhe via Mipmapping (`gl.generateMipmap`).
-*   **Ajuste de Eixos e CORS:** Para que o navegador consiga carregar as imagens de satélite do globo terrestre sem bloqueios de segurança locais, foram implementadas políticas dinâmicas de CORS (`anonymous`) e a inversão do eixo Y (`UNPACK_FLIP_Y_WEBGL`) para compatibilizar a textura com a orientação geométrica do WebGL.
+### 3. Asynchronous Texturing & CORS Bypass
+*   **Non-Blocking Rendering:** To prevent loading bottlenecks, 2D texture mapping occurs asynchronously. The system creates a temporary solid-color buffer (placeholder), and upon completing the final bitmap download event, renders the actual image and applies Level of Detail (LOD) optimization via Mipmapping (`gl.generateMipmap`).
+*   **Axis Adjustment & CORS:** To allow the browser to load Earth satellite images without local security blocks, dynamic CORS policies (`anonymous`) and Y-axis flipping (`UNPACK_FLIP_Y_WEBGL`) were implemented to align the texture with WebGL's geometric orientation.
 
-### 4. Iluminação por Fragmento - Phong Shading
-*   **Cálculo Per-Pixel:** Diferente do método tradicional Gouraud (iluminação calculada nos vértices), toda a equação matemática de reflexão ocorre diretamente no Fragment Shader, assegurando suavidade de transição nas cores.
-*   O modelo simula três propriedades da física da luz:
-    *   **Componente Ambiente:** Constante para iluminação indireta global.
-    *   **Componente Difusa:** Baseada no produto escalar (dot product) entre o vetor de normal e a direção do feixe de luz (Lambertian Reflection).
-    *   **Componente Especular:** Reflexo pontual intenso baseado na posição da câmera, angulação dos feixes reflexivos e coeficiente de brilho (shininess).
+### 4. Per-Fragment Lighting – Phong Shading
+*   **Per-Pixel Computation:** Unlike traditional Gouraud shading (lighting calculated at vertices), the entire mathematical reflection equation executes directly in the Fragment Shader, ensuring smooth color transitions.
+*   The model simulates three properties of light physics:
+    *   **Ambient Component:** Constant global indirect lighting.
+    *   **Diffuse Component:** Based on the dot product between the normal vector and the light ray direction (Lambertian Reflection).
+    *   **Specular Component:** Intense point reflection based on camera position, reflection beam angles, and shininess coefficient.
 
-### 5. Sombreamento Dinâmico - Shadow Mapping
-A projeção física da sombra da esfera sobre o plano utiliza uma abordagem de renderização em duas etapas (Multipass Rendering):
-1.  **Passagem de Oclusão (FBO):** A cena é primeiramente renderizada sob o ponto de vista tridimensional da Luz. Através de um *Framebuffer Object* (FBO), a informação de profundidade (Z-buffer) é gravada diretamente em uma textura do tipo `gl.DEPTH_COMPONENT24`. O buffer de cores é desativado nesta etapa para poupar recursos.
-2.  **Passagem de Renderização:** O Shader final avalia se a coordenada do fragmento atual está mais distante do que o valor registrado na textura de profundidade gerada na primeira etapa. Caso positivo, as contribuições difusas e especulares do fragmento são suprimidas (projetando a sombra). O cálculo conta com um fator de compensação adaptativo (*Shadow Bias*) para eliminar o efeito indesejado de *Shadow Acne*.
-
----
-
-## Desafios Técnicos de Engenharia de Baixo Nível Superados
-
-*   **Tipagem Estrita de Memória na GPU:** A API WebGL 2.0 não aceita arrays flexíveis nativos do JavaScript no envio de variáveis do tipo uniform. Para contornar crashes silenciosos, os arrays matemáticos foram serializados e mapeados na memória da placa através do método de casting `flatten()`, forçando a gravação em buffers estáticos do tipo `Float32Array`.
-*   **Consistência de Mapeamento de Layout:** Para garantir que os dois programas GLSL independentes (o do buffer de profundidade e o do renderer final) utilizassem os mesmos indexadores de memória física na GPU, os layouts de entrada foram fixados diretamente no código do shader compilado via diretiva `layout(location = x)`.
-*   **Vazamento de Texturas (Máquina de Estados do WebGL):** Devido à natureza do WebGL de operar como uma máquina de estados, a textura aplicada à esfera vazava e recobria o piso do cenário. O problema foi solucionado de forma altamente performática sem a necessidade de alternar programas de Shaders: declarou-se uma flag condicional `uniform bool` que comuta o estado dinamicamente no render loop, instruindo a GPU a amostrar a textura para a esfera e renderizar cor sólida neutra para o plano de fundo.
+### 5. Dynamic Shadowing – Shadow Mapping
+The physical projection of the sphere's shadow onto the plane uses a two-pass rendering approach (Multipass Rendering):
+1.  **Occlusion Pass (FBO):** The scene is first rendered from the 3D perspective of the Light source. Using a *Framebuffer Object* (FBO), depth information (Z-buffer) is written directly into a `gl.DEPTH_COMPONENT24` texture. The color buffer is disabled in this step to conserve resources.
+2.  **Render Pass:** The final Shader evaluates whether the current fragment's coordinate is further away than the value stored in the depth texture generated during the first pass. If so, the fragment's diffuse and specular contributions are suppressed (projecting the shadow). The calculation incorporates an adaptive compensation factor (*Shadow Bias*) to eliminate undesirable *Shadow Acne* artifacts.
 
 ---
 
-## Como Executar o Projeto Localmente
+## Low-Level Engineering Technical Challenges Overcome
 
-Devido às restrições modernas de segurança dos navegadores web para leitura de texturas locais (políticas de CORS e arquivos locais), o arquivo `esfera.html` **não deve** ser aberto clicando duas vezes sobre ele no gerenciador de arquivos (isso bloqueará a renderização).
-
-Para rodar o projeto perfeitamente:
-
-1.  Abra a pasta do projeto no **VS Code**.
-2.  Instale a extensão **Live Server** (caso já não possua).
-3.  Abra o arquivo principal `esfera.html`.
-4.  Clique no botão **"Go Live"** localizado no canto inferior direito do VS Code.
-5.  A aplicação abrirá automaticamente no seu navegador padrão em um servidor de desenvolvimento local (normalmente `http://127.0.0.1:5500/esfera.html`), com todas as texturas e sombras funcionando fluidamente.
+*   **Strict Memory Typing on the GPU:** The WebGL 2.0 API does not accept native JavaScript flexible arrays when passing uniform variables. To circumvent silent crashes, mathematical arrays were serialized and mapped to GPU memory using the `flatten()` casting method, forcing them into static `Float32Array` buffers.
+*   **Layout Mapping Consistency:** To guarantee that the two independent GLSL programs (the depth buffer shader and the final renderer) used the same physical memory indexers on the GPU, input layouts were fixed directly in the compiled shader code via the `layout(location = x)` directive.
+*   **Texture Leakage (WebGL State Machine):** Due to WebGL's state machine nature, the texture applied to the sphere leaked and covered the floor plane. This issue was resolved in a highly performant manner without switching Shader programs: a conditional `uniform bool` flag was declared to dynamically toggle state in the render loop, instructing the GPU to sample the texture for the sphere and render a neutral solid color for the background floor.
 
 ---
 
-## Informações Acadêmicas e Autores
+## How to Run the Project Locally
 
-Este projeto foi apresentado para a disciplina de Computação Gráfica do IFSP - Campus Guarulhos.
+Due to modern web browser security restrictions regarding local texture loading (CORS policies and local files), the `esfera.html` file **should not** be opened by double-clicking it in your file manager (this will block rendering).
 
-*   **Professor Orientador:** Dr. Thiago Schumacher Barcelos.
-*   **Autor (Aluno):**
+To run the project properly:
+
+1.  Open the project folder in **VS Code**.
+2.  Install the **Live Server** extension (if not already installed).
+3.  Open the main file `esfera.html`.
+4.  Click the **"Go Live"** button located in the bottom-right corner of VS Code.
+5.  The application will automatically open in your default browser on a local development server (typically `http://127.0.0.1:5500/esfera.html`), with all textures and shadows rendering smoothly.
+
+---
+
+## Academic Information & Authors
+
+This project was presented for the Computer Graphics course at IFSP – Campus Guarulhos.
+
+*   **Course Advisor / Professor:** Dr. Thiago Schumacher Barcelos.
+*   **Author (Student):**
     *   Nathan Iglesias Gomes de Oliveira
